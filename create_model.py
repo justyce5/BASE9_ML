@@ -13,6 +13,9 @@ from sklearn.feature_selection import SelectKBest, f_classif
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import cross_val_score
 import pickle
+from matplotlib import cm
+from matplotlib.colors import Normalize
+from matplotlib.lines import Line2D
 
 ##sklearn is data analysis library
 

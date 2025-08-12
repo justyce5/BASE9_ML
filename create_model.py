@@ -149,7 +149,8 @@ def create_stats (directory, column = 0, files = 1e5): #function that will calcu
     return statistic #output of the function will be the datatable
 
 
-def create_model(model_cluster_statistic, sampling_df):
+def create_model(model_cluster_statistic, sampling_df, target_feature = 'Single Sampling', X_columns = ['Width', 'Upper_bound', 'Lower_bound', 'Stdev', 'SnR', 'Dip_p',
+       'Dip_value', 'KS_value', 'KS_p', 'ESS']):
   
     #making sure source_id in both dataframes are the same datatype
     model_cluster_statistic['source_id'] = model_cluster_statistic['source_id'].astype(str)
@@ -157,19 +158,44 @@ def create_model(model_cluster_statistic, sampling_df):
 
     #merging dataframes based on source ids to match ids to  known sampling labels
     merged_df = model_cluster_statistic.merge(
-        sampling_df[['source_id', 'Single Sampling']],
+        sampling_df[['source_id', target_feature]],
         on='source_id',
         how='left'
     )
     
-    merged_df = merged_df.dropna(subset=['Single Sampling']) #dropping any rows with NaN values
+    merged_df = merged_df.dropna(subset=[target_feature]) #dropping any rows with NaN values
 
-    X = merged_df.drop(columns=['source_id', 'Single Sampling']) #dropping sourceid and sampling columns
-    y = merged_df['Single Sampling'] #target variable .. we want the model to predict these labels
+    # X = merged_df.drop(columns=['source_id', target_feature]).to_numpy() #dropping sourceid and sampling columns
+    
+    X = merged_df[X_columns].to_numpy()
+    y = merged_df[target_feature].to_numpy() #target variable .. we want the model to predict these labels
 
 
     # Splitting the data into training and test sets
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+    
+    # equalize the number of objects in each class for the training data
+    # get the size of the smallest class
+    u_classes = np.unique(y_train)
+    c_min = len(y_train)
+    for c in u_classes:
+        foo = len(np.where(y_train == c)[0])
+        if (foo < c_min):
+            c_min = foo
+    # Get balanced indices
+    balanced_indices = np.hstack([
+        np.random.choice(np.where(y_train == c)[0], c_min, replace=False)
+        for c in u_classes
+    ])
+    # Shuffle the balanced training set
+    np.random.shuffle(balanced_indices)
+    X_train = X_train[balanced_indices]
+    y_train = y_train[balanced_indices]
+    # final check
+    for c in u_classes:
+        print(f'There are {len(np.where(y_train == c)[0])} training elements with classification = {c}')
+
+
 
     ##random state - sets a seed in random number generator, ensures the splits generated are reproducible
     ##test size - proportion of dataset to include in test split ~ 30% of data is in test split
@@ -185,6 +211,8 @@ def create_model(model_cluster_statistic, sampling_df):
 
     X_test_save = X_test
     X_test = scaler.transform(X_test)
+    X_train = scaler.transform(X_train)
+    X = scaler.transform(X)
     ##fit - computes mean and stdevs to be used for scaling
     ##transform - perform scaling using mean and stdev from .fit
 
@@ -203,10 +231,12 @@ def create_model(model_cluster_statistic, sampling_df):
     clf.fit(X_train, y_train)
     ## training a model by feeding it a dataset and rfc learns patterns and relationships within data to make predictions on new unseen data
 
-    return X, y, clf, X_test, X_train, y_test
+    return X, y, clf, scaler, X_test, X_train, y_test
 
-def make_preds(X, clf, y_test = None, X_columns = ['Width', 'Upper_bound', 'Lower_bound', 'Stdev', 'SnR', 'Dip_p',
+def make_preds(X, clf, scaler, y_test = None, X_columns = ['Width', 'Upper_bound', 'Lower_bound', 'Stdev', 'SnR', 'Dip_p',
        'Dip_value', 'KS_value', 'KS_p', 'ESS']):
+    
+    X = scaler.transform(X)
     # Make predictions
     y_pred = clf.predict(X)
     ##making predictions from rfc 
@@ -236,8 +266,15 @@ def make_preds(X, clf, y_test = None, X_columns = ['Width', 'Upper_bound', 'Lowe
 
     
 
-def save_model(ngc2682_model, filename = 'my_model.pkl'):
-    pickle.dump(ngc2682_model, open(filename, 'wb'))
+def save_model(model, scaler, filename = 'my_model.pkl'):
+    output = {'model':model, 'scaler':scaler}
+    pickle.dump(output, open(filename, 'wb'))
+def load_model(filename = 'my_model.pkl'):
+    with open(filename, 'rb') as f:
+        input = pickle.load(f)
+    model = input['model']
+    scaler = input['scaler']
+    return model, scaler
 
 #creating a function that will save the model to a pickle file to be used later
     

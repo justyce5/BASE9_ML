@@ -206,10 +206,11 @@ def create_model(
     y = merged_df[label_column_name].to_numpy()  
 
     # Splitting the data into training and test sets
-    # random state - sets a seed in random number generator, ensures the splits generated are reproducible
-    # test size - proportion of dataset to include in test split ~ 30% of data is in test split
+    # random_state - sets a seed in random number generator, ensures the splits generated are reproducible
+    # test_size - proportion of dataset to include in test split ~ 30% of data is in test split
     # allows to train a model on training set and test its accuracy on testing set
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=random_seed)
+    random_state = np.random.seed(random_seed)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=random_state)
 
     # equalize the number of objects in each class for the training data
     # get the size of the smallest class
@@ -241,7 +242,7 @@ def create_model(
     # The StandardScaler will shift the mean and scale to unit variance
     pipe = Pipeline([
         ('scaler', StandardScaler()),
-        ('rf', RandomForestClassifier(random_state=random_seed))
+        ('rf', RandomForestClassifier(random_state=random_state))
     ])
 
     # fit to the training data
